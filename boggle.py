@@ -1,19 +1,28 @@
 #!/usr/bin/env python
 #
-from pprint import pprint
+from pprint import pprint, pformat
 import random
 import string
 
 words = set(word for word in open('words.txt').read().split() if len(word) > 3)
-results = set()
-
-WordTree = {} # This nested dictionary can be used to find word starts
-for word in words:
-    d = WordTree
-    for letter in word:
-        if letter not in d: d[letter] = {}
-        d = d[letter]
-    d['is_word'] = True
+results = dict()
+try:
+    print "Loading Word tree..."
+    WordTree = eval(open('wordtree.py').read(), {}, {})
+    print "Loaded Word tree"
+except Exception, e:
+    print e
+    print "Generating word tree..."
+    WordTree = {} # This nested dictionary can be used to find word starts
+    for word in words:
+        d = WordTree
+        for letter in word:
+            letter = letter.lower()
+            if letter not in d: d[letter] = {}
+            d = d[letter]
+        d['is_word'] = True
+    open('wordtree.py', 'w').write(pformat(WordTree))
+    print "Generated word tree"
 
 class Cell(object):
     def __init__(self, value): self._value = value
@@ -60,16 +69,21 @@ class Chain(object):
 
 
 def isWordStart(string_in):
+    list_in = (letter for letter in string_in)
+    string_out = ''
     d = WordTree
-    for letter in string_in:
-        if letter not in d: return False
+    for letter in list_in:
+        if letter not in d:
+            if string_out[-1] == 'q' and 'u' in d:
+                string_out += 'u' + letter
+                for letter in list_in: string_out += letter
+                return isWordStart(string_out)
+            else:
+                return False
+        string_out += letter
         d = d[letter]
+    if 'is_word' in d and string_in not in results: results[string_in] = word_score(string_in)
     return True
-
-
-def isLegalWord(string_in):
-    if len(string_in) <= 3: return False
-    if string_in in words: return True
 
 
 class ChainCopy(Chain):
@@ -82,9 +96,6 @@ class ChainCopy(Chain):
         self._chain = [x for x in chain._chain]
         self._grid = chain._grid
         self.cx, self.cy = chain.cx, chain.cy
-        if isLegalWord(self.__str__()):
-            if self.__str__() not in results:
-                results.add(str(self))
 
     def add(self, (posx, posy)):
         self.cx, self.cy = posx, posy
@@ -103,14 +114,28 @@ class Solver(object):
         for x in range(self.grid._size):
             for y in range(self.grid._size):
                 self.rec(Chain(self.grid, (x, y)))
-
+def word_score(word):
+    l = len(word)
+    if l  < 3:
+        return 0
+    elif l == 3:
+        return 1
+    elif l < 8:
+        return l - 3
+    else:
+        return 11
+def get_score():
+    score = sum(results.values())
+    msg = "\nFound %d words out of a dictionary of %d, resulting in a score of %d points\n"%(len(results), len(words), score)
+    print msg
+    pprint(results)
+    print msg
 
 if __name__ == "__main__":
-    G = Grid(128)
+    print "\nGenerating grid\n"
+    G = Grid(6)
     S = Solver(G)
     print G
+    print "\nSolving:"
     S.solve()
-
-    print len(results), '/', len(words)
-    pprint(results)
-    print len(results), '/', len(words)
+    get_score()
