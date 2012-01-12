@@ -8,7 +8,7 @@ words = set(word for word in open('words.txt').read().split() if len(word) > 3)
 results = dict()
 try:
     print "Loading Word tree..."
-    WordTree = eval(open('wordtree.py').read(), {}, {})
+    WordTree = eval(open('wordtree2.py').read(), {}, {})
     print "Loaded Word tree"
 except Exception, e:
     print e
@@ -20,8 +20,8 @@ except Exception, e:
             letter = letter.lower()
             if letter not in d: d[letter] = {}
             d = d[letter]
-        d['is_word'] = True
-    open('wordtree.py', 'w').write(pformat(WordTree))
+        d['is_word'] = word
+    open('wordtree2.py', 'w').write(pformat(WordTree))
     print "Generated word tree"
 
 class Cell(object):
@@ -45,6 +45,7 @@ class Chain(object):
     def __init__(self, grid, (posx, posy)):
         self._chain = [grid.content[posx][posy]]
         self._grid = grid
+        self._wordtree = WordTree.get(self._chain[-1]())
         self.cx = posx
         self.cy = posy
 
@@ -61,33 +62,17 @@ class Chain(object):
                 if y not in range(self._grid._size): continue
                 potential = self._grid.content[x][y]
                 if potential in self._chain: continue
-                newchain = ChainCopy(self)
-                newchain.add((x, y))
-                if isWordStart(str(newchain)):
+                l = potential()
+                if l not in self._wordtree:
+                    if l == 'q' and 'u' in self._wordtree:
+                        l == 'u'
+                if l in self._wordtree:
+                    newchain = ChainCopy(self, (x,y))
                     yield newchain
         return
 
-
-def isWordStart(string_in):
-    list_in = (letter for letter in string_in)
-    string_out = ''
-    d = WordTree
-    for letter in list_in:
-        if letter not in d:
-            if string_out[-1] == 'q' and 'u' in d:
-                string_out += 'u' + letter
-                for letter in list_in: string_out += letter
-                return isWordStart(string_out)
-            else:
-                return False
-        string_out += letter
-        d = d[letter]
-    if 'is_word' in d and string_in not in results: results[string_in] = word_score(string_in)
-    return True
-
-
 class ChainCopy(Chain):
-    def __init__(self, chain):
+    def __init__(self, chain, (posx,posy)):
         """
         This replaces rather than enhances the init
         function of its superclass, acting as a copy
@@ -95,12 +80,12 @@ class ChainCopy(Chain):
         """
         self._chain = [x for x in chain._chain]
         self._grid = chain._grid
-        self.cx, self.cy = chain.cx, chain.cy
-
-    def add(self, (posx, posy)):
         self.cx, self.cy = posx, posy
         self._chain.append(self._grid.content[posx][posy])
-
+        self._wordtree = chain._wordtree.get(self._chain[-1]())
+        word = self._wordtree.get('is_word')
+        if word and word not in results:
+            results[word] = word_score(word)
 
 class Solver(object):
     def __init__(self, grid):
